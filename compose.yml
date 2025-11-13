@@ -115,7 +115,7 @@ services:
       - SERVER_PORT=3333
       - SERVER_SECRET=${SECRET}
       - DB_URL=${CR_DB_URL}
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=http://localhost:8087
       - ACCOUNTS_URL=http://account:3000
       - FULLTEXT_URL=http://fulltext:4700
@@ -133,7 +133,7 @@ services:
       - SECRET=${SECRET}
       - ACCOUNTS_URL=http://account:3000
       - STATS_URL=http://stats:4900
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
     restart: unless-stopped
     networks:
       - huly_net
@@ -145,7 +145,7 @@ services:
       - SERVER_SECRET=${SECRET}
       - DB_URL=${CR_DB_URL}
       - TRANSACTOR_URL=ws://transactor:3333;ws${SECURE:+s}://${HOST_ADDRESS}/_transactor
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=http${SECURE:+s}://${HOST_ADDRESS}
       - STATS_URL=http://stats:4900
       - STATS_API=http${SECURE:+s}://${HOST_ADDRESS}/_stats
@@ -163,7 +163,7 @@ services:
       - SERVER_SECRET=${SECRET}
       - DB_URL=${CR_DB_URL}
       - TRANSACTOR_URL=ws://transactor:3333;ws${SECURE:+s}://${HOST_ADDRESS}/_transactor
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
       - MODEL_ENABLED=*
       - ACCOUNTS_URL=http://account:3000
       - STATS_URL=http://stats:4900
@@ -189,12 +189,14 @@ services:
       - UPLOAD_URL=/files
       - ELASTIC_URL=http://elastic:9200
       - COLLABORATOR_URL=ws${SECURE:+s}://${HOST_ADDRESS}/_collaborator
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
       - TITLE=${TITLE:-Huly Self Host}
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
       - LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
       - DESKTOP_UPDATES_CHANNEL=${DESKTOP_CHANNEL}
       - PULSE_URL=ws${SECURE:+s}://${HOST_ADDRESS}/_pulse
+      - STREAM_URL=http${SECURE:+s}://${HOST_ADDRESS}/_stream/recording
+      - PREVIEW_URL=http${SECURE:+s}://${HOST_ADDRESS}/_preview
     restart: unless-stopped
     networks:
       - huly_net
@@ -206,7 +208,7 @@ services:
       - DB_URL=${CR_DB_URL}
       - FULLTEXT_DB_URL=http://elastic:9200
       - ELASTIC_INDEX_NAME=huly_storage_index
-      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
       - REKONI_URL=http://rekoni:4004
       - ACCOUNTS_URL=http://account:3000
       - STATS_URL=http://stats:4900
@@ -272,7 +274,7 @@ services:
       - huly_net
 
   process-service:
-    image: haiodo/process
+    image: haiodo/process:${HULY_VERSION}
     extra_hosts:
       - "huly.local:host-gateway"
     depends_on:
@@ -282,9 +284,51 @@ services:
         condition: service_started
     environment:
       - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3000
+      - ACCOUNTS_URL=http://account:3000
       - QUEUE_CONFIG=redpanda:9092
-      - QUEUE_REGION=cockroach
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  stream:
+    image: 'haiodo/stream:${HULY_VERSION}'
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    environment:
+      - STREAM_ENDPOINT_URL=s3://minio
+      - STREAM_INSECURE=true
+      - STREAM_SERVER_SECRET=${SECRET}
+      - STREAM_MAX_PARALLEL_SCALING_COUNT=6
+      - STREAM_LOG_LEVEL=debug
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - STREAM_QUEUE_CONFIG=redpanda:9092
+    ports:
+      - 1080:1080
+    restart: unless-stopped
+    networks:
+      - huly_net
+  media:
+    image: 'haiodo/media:${HULY_VERSION}'
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    environment:
+      - ACCOUNTS_URL=http://account:3000
+      - SECRET=${SECRET}
+      - QUEUE_CONFIG=redpanda:9092
+    restart: unless-stopped
+    networks:
+      - huly_net
+  preview:
+    image: 'haiodo/preview:${HULY_VERSION}'
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    environment:
+      - SECRET=${SECRET}
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
+      - CACHE_PATH=/data/cache
+    ports:
+      - 4040:4040
     restart: unless-stopped
     networks:
       - huly_net

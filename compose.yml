@@ -212,6 +212,7 @@ services:
       - PREVIEW_URL=http${SECURE:+s}://${HOST_ADDRESS}/_preview
       - DATALAKE_URL=http${SECURE:+s}://${HOST_ADDRESS}/_datalake
       - FILES_URL=http${SECURE:+s}://${HOST_ADDRESS}/_datalake/blob/:workspace/:blobId/:filename
+      - LIVEKIT_WS=${LIVEKIT_HOST}
     restart: unless-stopped
     networks:
       - huly_net
@@ -372,6 +373,26 @@ services:
       - CACHE_PATH=/data/cache
     ports:
       - 4040:4040
+    restart: unless-stopped
+    networks:
+      - huly_net
+
+  love:
+    image: haiodo/love:${HULY_VERSION}
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    environment:
+      - PORT=8096
+      - SECRET=${SECRET}
+      - ACCOUNTS_URL=http://account:3000
+      - DB_URL=${CR_DB_URL}
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
+      - STORAGE_PROVIDER_NAME=minio
+      - LIVEKIT_HOST=${LIVEKIT_HOST}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+    ports:
+      - 8096:8096
     restart: unless-stopped
     networks:
       - huly_net

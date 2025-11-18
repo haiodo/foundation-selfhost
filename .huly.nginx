@@ -128,7 +128,7 @@ server {
         proxy_set_header Connection "upgrade";
 
         rewrite ^/_pulse(.*)$ /ws$1 break;
-        proxy_pass http://hulypulse:8099;
+        proxy_pass http://hulypulse:8098;
     }
     location /_stream {
         proxy_set_header Host $host;
@@ -137,7 +137,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
 
         rewrite ^/_stream(.*)$ $1 break;
-        proxy_pass http://stream:1080;
+        proxy_pass http://stream:1081;
     }
 
     location /_preview {
@@ -147,7 +147,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
 
         rewrite ^/_preview(.*)$ $1 break;
-        proxy_pass http://preview:4040;
+        proxy_pass http://preview:4041;
     }
 
      location /_datalake {
@@ -157,7 +157,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
 
         rewrite ^/_datalake(/.*)$ $1 break;
-        proxy_pass http://datalake:4030/;
+        proxy_pass http://datalake:4031/;
     }
 
     #location /_github {

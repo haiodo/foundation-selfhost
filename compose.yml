@@ -129,6 +129,7 @@ services:
       - STATS_URL=http://stats:4900
       - LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
       - QUEUE_CONFIG=redpanda:9092
+      - AI_BOT_URL=http://aibot:4011
     restart: unless-stopped
     networks:
       - huly_net
@@ -211,6 +212,7 @@ services:
       - DATALAKE_URL=http${SECURE:+s}://${HOST_ADDRESS}/_datalake
       - FILES_URL=http${SECURE:+s}://${HOST_ADDRESS}/_datalake/blob/:workspace/:blobId/:filename
       - LIVEKIT_WS=${LIVEKIT_HOST}
+      - AI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_ai
     restart: unless-stopped
     networks:
       - huly_net
@@ -390,6 +392,36 @@ services:
     ports:
       - 8096:8096
     restart: unless-stopped
+    networks:
+      - huly_net
+
+  aibot:
+    image: haiodo/ai-bot:${HULY_VERSION}
+    ports:
+      - 4011:4011
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    restart: unless-stopped
+    links:
+      - account
+      - transactor
+    environment:
+      - PORT=4011
+      - SERVER_SECRET=${SECRET}
+      - QUEUE_CONFIG=redpanda:9092
+      - ACCOUNTS_URL=http://account:3000
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
+      - FIRST_NAME=Юля
+      - LAST_NAME=AI
+      - PASSWORD=password
+      - AVATAR_PATH=./avatar.png
+      - AVATAR_CONTENT_TYPE=.png
+      - STATS_URL=http://stats:4900
+      - LOVE_ENDPOINT=http://love:8096
+      - OPENAI_API_KEY=token
+      - OPENAI_SUMMARY_MODEL=openai/gpt-oss-20b
+      - OPENAI_TRANSLATE_MODEL=openai/gpt-oss-20b
+      - OPENAI_BASE_URL=http://localhost:1234/v1/
     networks:
       - huly_net
 volumes:

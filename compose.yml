@@ -339,6 +339,7 @@ services:
       - STREAM_ENDPOINT_URL=datalake://datalake:4031
       - STREAM_INSECURE=true
       - STREAM_SERVER_SECRET=${SECRET}
+      - STREAM_SERVE_URL=0.0.0.0:1081
       - STREAM_BASE_URL=http${SECURE:+s}://${HOST_ADDRESS}/_stream
       - STREAM_MAX_PARALLEL_SCALING_COUNT=2
       - STREAM_LOG_LEVEL=debug
@@ -346,7 +347,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - STREAM_QUEUE_CONFIG=redpanda:9092
     ports:
-      - 1081:1080
+      - 1081:1081
     restart: unless-stopped
     networks:
       - huly_net

@@ -369,8 +369,9 @@ services:
       - SECRET=${SECRET}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - CACHE_PATH=/data/cache
+      - PORT=4041
     ports:
-      - 4041:4040
+      - 4041:4041
     restart: unless-stopped
     networks:
       - huly_net

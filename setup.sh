@@ -195,6 +195,9 @@ export VOLUME_REDPANDA_PATH=$_VOLUME_REDPANDA_PATH
 export HULY_SECRET=$(cat .huly.secret)
 export POSTGRES_SECRET=$(cat .postgres.secret)
 export REDPANDA_SECRET=$(cat .rp.secret)
+export LIVEKIT_HOST=${LIVEKIT_HOST}
+export LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+export LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
 
 envsubst < .template.huly.conf > $CONFIG_FILE
 

@@ -355,10 +355,10 @@ Huly audio and video calls are created on top of a LiveKit media server. The rep
    - `3478/tcp` and `3478/udp` – TURN
    - `50000-60000/udp` – media relay range
 
-To present your own certificate on port `5349`, drop the PEM-encoded certificate (full chain) and private key
-into `./livekit-certs/livekit.crt` and `./livekit-certs/livekit.key` respectively before starting Docker. The
-`livekit` service automatically mounts that directory into `/etc/livekit/certs`, and the generated
-`livekit.yaml` already points the TURN settings at those paths.
+To present your own certificate on port `5349`, drop the PEM-encoded full-chain certificate and private key
+into `./certs/fullchain.pem` and `./certs/privkey.pem` respectively before starting Docker. Both the `nginx`
+and `livekit` services mount that directory (read-only), and the generated `livekit.yaml` already points the
+TURN settings at `/etc/livekit/certs/fullchain.pem` and `/etc/livekit/certs/privkey.pem`.
 LiveKit must stay on the `huly_net` Docker network so it can talk to `redis`, so do **not** switch it to host
 networking—publishing the ports above is sufficient. 3. Start `docker compose up -d`. The compose file already propagates the `LIVEKIT_*` variables to both the
 `love` backend and the `front` web application, while the nginx templates expose `/livekit/` so clients can

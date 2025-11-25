@@ -6,6 +6,7 @@ services:
       - '${HTTP_BIND}:${HTTP_PORT}:80'
     volumes:
       - ./.huly.nginx:/etc/nginx/conf.d/default.conf
+      - ./certs:/etc/huly/certs:ro
     restart: unless-stopped
     links:
       - account
@@ -444,7 +445,7 @@ services:
       - '50000-60000:50000-60000/udp'
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
-      - ./livekit-certs:/etc/livekit/certs:ro
+      - ./certs:/etc/livekit/certs:ro
     networks:
       - huly_net
 

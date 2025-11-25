@@ -426,6 +426,28 @@ services:
       - OPENAI_BASE_URL=http://localhost:1234/v1/
     networks:
       - huly_net
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    ports:
+      - 7880:7880/tcp
+      - 7881:7881/tcp
+      - 5349:5349/tcp
+      - 5349:5349/udp
+      - 3478:3478/tcp
+      - 3478:3478/udp
+      - '50000-60000:50000-60000/udp'
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+      - ./livekit-certs:/etc/livekit/certs:ro
+    networks:
+      - huly_net
+
 volumes:
   # These named volumes are used when custom volume paths are not specified
   # If VOLUME_*_PATH variables are set, these volumes will be ignored

@@ -4,6 +4,10 @@ if [ -f ".env" ]; then
     source ".env"
 fi
 
+if [ -z "$LIVEKIT_ENABLED" ] && [ -f "huly_v7.conf" ]; then
+    source "huly_v7.conf"
+fi
+
 # Check for --recreate flag
 RECREATE=false
 if [ "$1" == "--recreate" ]; then
@@ -11,22 +15,65 @@ if [ "$1" == "--recreate" ]; then
 fi
 
 # Handle nginx.conf recreation or updating
+TEMPLATE_FILE=".template.nginx.conf"
+TEMPLATE_NAME="standard"
+LIVEKIT_MARKER="# LiveKit proxy block"
+
+if [[ "$LIVEKIT_ENABLED" == "true" ]]; then
+    TEMPLATE_FILE=".template.nginx-livekit.conf"
+    TEMPLATE_NAME="LiveKit"
+fi
+
+COPY_REASON=""
 if [ "$RECREATE" == true ]; then
-    cp .template.nginx.conf nginx.conf
-    echo "nginx.conf has been recreated from the template."
+    COPY_REASON="recreate"
+elif [ ! -f "nginx.conf" ]; then
+    COPY_REASON="missing"
+elif [[ "$LIVEKIT_ENABLED" == "true" ]]; then
+    if ! grep -q "$LIVEKIT_MARKER" nginx.conf; then
+        COPY_REASON="enable_livekit"
+    fi
 else
-    if [ ! -f "nginx.conf" ]; then
-        echo "nginx.conf not found, creating from template."
-        cp .template.nginx.conf nginx.conf
-    else
-        echo "nginx.conf already exists. Only updating server_name, listen, and proxy_pass."
-        echo "Run with --recreate to fully overwrite nginx.conf."
+    if grep -q "$LIVEKIT_MARKER" nginx.conf; then
+        COPY_REASON="disable_livekit"
     fi
 fi
 
-# Update server_name and proxy_pass using sed
+if [[ -n "$COPY_REASON" ]]; then
+    cp "$TEMPLATE_FILE" nginx.conf
+    case "$COPY_REASON" in
+        recreate)
+            echo "nginx.conf has been recreated from the ${TEMPLATE_NAME} template."
+            ;;
+        missing)
+            echo "nginx.conf not found, created from the ${TEMPLATE_NAME} template."
+            ;;
+        enable_livekit)
+            echo "Switched nginx.conf to the LiveKit-aware template."
+            ;;
+        disable_livekit)
+            echo "Reverted nginx.conf to the standard template."
+            ;;
+    esac
+else
+    echo "nginx.conf already exists. Only updating server_name, listen, and proxy_pass."
+    echo "Run with --recreate to fully overwrite nginx.conf."
+fi
+
+# Update server_name and proxy_pass
 sed -i.bak "s|server_name .*;|server_name ${HOST_ADDRESS};|" ./nginx.conf
-sed -i.bak "s|proxy_pass .*;|proxy_pass http://${HTTP_BIND:-127.0.0.1}:${HTTP_PORT};|" ./nginx.conf
+
+BACKEND_TARGET="http://${HTTP_BIND:-127.0.0.1}:${HTTP_PORT}"
+awk -v backend="$BACKEND_TARGET" '
+    BEGIN { done = 0 }
+    {
+        if (!done && $0 ~ /proxy_pass/ && $0 !~ /livekit/) {
+            sub(/proxy_pass [^;]*;/, "proxy_pass " backend ";")
+            done = 1
+        }
+        print
+    }
+' nginx.conf > nginx.conf.tmp && mv nginx.conf.tmp nginx.conf || echo "Warning: unable to update proxy_pass in nginx.conf"
 
 # Update listen directive to either port 80 or 443, while preserving IP address
 if [[ -n "$SECURE" ]]; then
@@ -44,7 +91,7 @@ IP_ADDRESS=$(grep -oE 'listen \K[^:]+(?=:[0-9]+ ssl;)' nginx.conf)
 
 # Remove HTTP to HTTPS redirect server block if SSL is enabled
 if [[ -z "$SECURE" ]]; then
-    echo "Enabling SSL; removing HTTP to HTTPS redirect block..."
+    echo "SSL disabled; ensuring no HTTP to HTTPS redirect block remains..."
     # Remove the entire server block for port 80
     if grep -q 'return 301 https://\$host\$request_uri;' nginx.conf; then
         sed -i.bak '/# !/,/!/d' nginx.conf

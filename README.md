@@ -30,10 +30,12 @@ sudo ln -s $(pwd)/nginx.conf /etc/nginx/sites-enabled/huly.conf
 > [!NOTE]
 > If you change `HOST_ADDRESS`, `SECURE`, `HTTP_PORT` or `HTTP_BIND` be sure to update your [nginx.conf](./nginx.conf)
 > by running:
+>
 > ```bash
 > ./nginx.sh
 > ```
->You can safely execute this script after adding your custom configurations like ssl. It will only overwrite the
+>
+> You can safely execute this script after adding your custom configurations like ssl. It will only overwrite the
 > necessary settings.
 
 Finally, let's reload `nginx` and start Huly with `docker compose`.
@@ -65,6 +67,7 @@ When running `./setup.sh`, you'll be prompted to specify custom paths for:
 - **Redpanda data volume**: Data storage for Kafka
 
 You can either:
+
 - Press Enter to use the default Docker named volumes
 - Specify an absolute path on your host system (e.g., `/var/huly/db`)
 - Enter `default` to clear an existing custom path and revert to Docker named volumes
@@ -218,34 +221,34 @@ The Mail Service is responsible for sending email notifications and confirmation
 
 1. Add the `mail` container to the `docker-compose.yaml` file. Specify the email address you will use to send emails as "SOURCE":
 
-    ```yaml
-    mail:
-      image: haiodo/mail:${HULY_VERSION}
-      container_name: mail
-      ports:
-        - 8097:8097
-      environment:
-        - PORT=8097
-        - SOURCE=<EMAIL_FROM>
-      restart: unless-stopped
-      networks:
-        - huly_net
-    ```
+   ```yaml
+   mail:
+     image: haiodo/mail:${HULY_VERSION}
+     container_name: mail
+     ports:
+       - 8097:8097
+     environment:
+       - PORT=8097
+       - SOURCE=<EMAIL_FROM>
+     restart: unless-stopped
+     networks:
+       - huly_net
+   ```
 
 2. Add the mail container URL to the `transactor` and `account` containers:
 
-    ```yaml
-    account:
-      ...
-      environment:
-        - MAIL_URL=http://mail:8097
-      ...
-    transactor:
-      ...
-      environment:
-        - MAIL_URL=http://mail:8097
-      ...
-    ```
+   ```yaml
+   account:
+     ...
+     environment:
+       - MAIL_URL=http://mail:8097
+     ...
+   transactor:
+     ...
+     environment:
+       - MAIL_URL=http://mail:8097
+     ...
+   ```
 
 3. In `Settings -> Notifications`, set up email notifications for the events you want to be notified about. Note that this is a user-specific setting, not company-wide; each user must set up their own notification preferences.
 
@@ -255,16 +258,16 @@ To integrate with an external SMTP server, update the `docker-compose.yaml` file
 
 1. Add SMTP configuration to the environment section:
 
-    ```yaml
-    mail:
-      ...
-      environment:
-        ...
-        - SMTP_HOST=<SMTP_SERVER_URL>
-        - SMTP_PORT=<SMTP_SERVER_PORT>
-        - SMTP_USERNAME=<SMTP_USER>
-        - SMTP_PASSWORD=<SMTP_PASSWORD>
-    ```
+   ```yaml
+   mail:
+     ...
+     environment:
+       ...
+       - SMTP_HOST=<SMTP_SERVER_URL>
+       - SMTP_PORT=<SMTP_SERVER_PORT>
+       - SMTP_USERNAME=<SMTP_USER>
+       - SMTP_PASSWORD=<SMTP_PASSWORD>
+   ```
 
 2. Replace `<SMTP_SERVER_URL>` and `<SMTP_SERVER_PORT>` with your SMTP server's hostname and port. It's recommended to use a secure port, such as `587`.
 
@@ -276,35 +279,32 @@ To integrate with an external SMTP server, update the `docker-compose.yaml` file
 
 2. Create a new IAM policy with the following permissions:
 
-    ```json
-    {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Effect": "Allow",
-          "Action": [
-            "ses:SendEmail",
-            "ses:SendRawEmail"
-          ],
-          "Resource": "*"
-        }
-      ]
-    }
-    ```
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
 
 3. Create a separate IAM user for SES API access, assigning the newly created policy to this user.
 
 4. Configure SES environment variables in the `mail` container:
 
-    ```yaml
-    mail:
-      ...
-      environment:
-        ...
-        - SES_ACCESS_KEY=<SES_ACCESS_KEY>
-        - SES_SECRET_KEY=<SES_SECRET_KEY>
-        - SES_REGION=<SES_REGION>
-    ```
+   ```yaml
+   mail:
+     ...
+     environment:
+       ...
+       - SES_ACCESS_KEY=<SES_ACCESS_KEY>
+       - SES_SECRET_KEY=<SES_SECRET_KEY>
+       - SES_REGION=<SES_REGION>
+   ```
 
 ### Verifying Mail Service
 
@@ -336,74 +336,62 @@ Huly supports Gmail integration allowing users to connect their Gmail accounts a
 
 For detailed setup instructions, see the [Gmail Configuration Guide](guides/gmail-configuration.md).
 
-
 ## Love Service (Audio & Video calls)
 
-Huly audio and video calls are created on top of LiveKit insfrastructure. In order to use Love service in your
-self-hosted Huly, perform the following steps:
+Huly audio and video calls are created on top of a LiveKit media server. The repository already contains the
+`love`, `front`, and `livekit` services; you only need to provide credentials and networking.
 
-1. Set up [LiveKit Cloud](https://cloud.livekit.io) account
-2. Add `love` container to the docker-compose.yaml
+1. Run `./setup.sh` and answer **Yes** when prompted about LiveKit. The helper can reuse an existing
+   configuration or execute `docker run --rm -it -v "$PWD":/output livekit/generate --local` to mint a new
+   API key and secret, update `livekit.yaml`, and inject the resulting values into `huly_v7.conf`.
+2. When asked for the TURN domain, supply a DNS hostname that resolves to the same IP as your primary Huly domain.
+   The script suggests `turn.<your-domain>` automatically, but you can override it if you prefer a different
+   subdomain. Make sure you create DNS records for both the primary hostname and the TURN hostname, and open these
+   ports on your firewall/router:
+   - `7880/tcp` – LiveKit HTTP/WebSocket API
+   - `7881/tcp` – TCP relay
+   - `5349/tcp` – TURN over TLS
+   - `5349/udp` – TURN over TLS (DTLS/UDP fallback)
+   - `3478/tcp` and `3478/udp` – TURN
+   - `50000-60000/udp` – media relay range
 
-    ```yaml
-      love:
-        image: haiodo/love:${HULY_VERSION}
-        container_name: love
-        ports:
-          - 8096:8096
-        environment:
-          - PORT=8096
-          - SECRET=${SECRET}
-          - ACCOUNTS_URL=http://account:3000
-          - DB_URL=${CR_DB_URL}
-          - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
-          - STORAGE_PROVIDER_NAME=minio
-          - LIVEKIT_HOST=<LIVEKIT_HOST>
-          - LIVEKIT_API_KEY=<LIVEKIT_API_KEY>
-          - LIVEKIT_API_SECRET=<LIVEKIT_API_SECRET>
-        restart: unless-stopped
-        networks:
-          - huly_net
-    ```
-
-3. Configure `front` service:
-
-    ```yaml
-      front:
-        ...
-        environment:
-          - LIVEKIT_WS=<LIVEKIT_HOST>
-        ...
-    ```
+  To present your own certificate on port `5349`, drop the PEM-encoded certificate (full chain) and private key
+  into `./livekit-certs/livekit.crt` and `./livekit-certs/livekit.key` respectively before starting Docker. The
+  `livekit` service automatically mounts that directory into `/etc/livekit/certs`, and the generated
+  `livekit.yaml` already points the TURN settings at those paths.
+LiveKit must stay on the `huly_net` Docker network so it can talk to `redis`, so do **not** switch it to host
+networking—publishing the ports above is sufficient. 3. Start `docker compose up -d`. The compose file already propagates the `LIVEKIT_*` variables to both the
+`love` backend and the `front` web application, while the nginx templates expose `/livekit/` so clients can
+reach the server via `ws(s)://<your-domain>/livekit`.
 
 ## Print Service
 
 1. Add `print` container to the docker-compose.yaml
 
-    ```yaml
-      print:
-        image: haiodo/print:${HULY_VERSION}
-        container_name: print
-        ports:
-          - 4005:4005
-        environment:
-          - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
-          - STATS_URL=http://stats:4900
-          - SECRET=${SECRET}
-        restart: unless-stopped
-        networks:
-          - huly_net
-    ```
+   ```yaml
+   print:
+     image: haiodo/print:${HULY_VERSION}
+     container_name: print
+     ports:
+       - 4005:4005
+     environment:
+       - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+       - STATS_URL=http://stats:4900
+       - SECRET=${SECRET}
+     restart: unless-stopped
+     networks:
+       - huly_net
+   ```
 
 2. Configure `front` service:
 
-    ```yaml
-      front:
-        ...
-        environment:
-          - PRINT_URL=http${SECURE:+s}://${HOST_ADDRESS}/_print
-        ...
-    ```
+   ```yaml
+     front:
+       ...
+       environment:
+         - PRINT_URL=http${SECURE:+s}://${HOST_ADDRESS}/_print
+       ...
+   ```
 
 3. Uncomment print section in `.huly.nginx` file and reload nginx
 
@@ -418,51 +406,51 @@ Huly provides AI-powered chatbot that provides several services:
 1. Set up OpenAI account
 2. Add `aibot` container to the docker-compose.yaml
 
-    ```yaml
-      aibot:
-        image: haiodo/ai-bot:${HULY_VERSION}
-        ports:
-          - 4010:4010
-        environment:
-          - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
-          - SERVER_SECRET=${SECRET}
-          - ACCOUNTS_URL=http://account:3000
-          - DB_URL=${CR_DB_URL}
-          - MONGO_URL=mongodb://mongodb:27017
-          - STATS_URL=http://stats:4900
-          - FIRST_NAME=Bot
-          - LAST_NAME=Huly AI
-          - PASSWORD=<PASSWORD>
-          - OPENAI_API_KEY=<OPENAI_API_KEY>
-          - OPENAI_BASE_URL=<OPENAI_BASE_URL>
-          # optional if you use love service
-          - LOVE_ENDPOINT=http://love:8096
-        restart: unless-stopped
-        networks:
-          - huly_net
-    ```
+   ```yaml
+   aibot:
+     image: haiodo/ai-bot:${HULY_VERSION}
+     ports:
+       - 4010:4010
+     environment:
+       - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=minioadmin
+       - SERVER_SECRET=${SECRET}
+       - ACCOUNTS_URL=http://account:3000
+       - DB_URL=${CR_DB_URL}
+       - MONGO_URL=mongodb://mongodb:27017
+       - STATS_URL=http://stats:4900
+       - FIRST_NAME=Bot
+       - LAST_NAME=Huly AI
+       - PASSWORD=<PASSWORD>
+       - OPENAI_API_KEY=<OPENAI_API_KEY>
+       - OPENAI_BASE_URL=<OPENAI_BASE_URL>
+       # optional if you use love service
+       - LOVE_ENDPOINT=http://love:8096
+     restart: unless-stopped
+     networks:
+       - huly_net
+   ```
 
 3. Configure `front` service:
 
-    ```yaml
-      front:
-        ...
-        environment:
-          # this should be available outside of the cluster
-          - AI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_aibot
-        ...
-    ```
+   ```yaml
+     front:
+       ...
+       environment:
+         # this should be available outside of the cluster
+         - AI_URL=http${SECURE:+s}://${HOST_ADDRESS}/_aibot
+       ...
+   ```
 
 4. Configure `transactor` service:
 
-    ```yaml
-      transactor:
-        ...
-        environment:
-          # this should be available inside of the cluster
-          - AI_BOT_URL=http://aibot:4010
-        ...
-    ```
+   ```yaml
+     transactor:
+       ...
+       environment:
+         # this should be available inside of the cluster
+         - AI_BOT_URL=http://aibot:4010
+       ...
+   ```
 
 5. Uncomment aibot section in `.huly.nginx` file and reload nginx
 
@@ -481,22 +469,22 @@ To integrate Google Calendar with Huly, follow these steps:
 Add `calendar` container to the docker-compose.yaml
 
 ```yaml
-  calendar:
-    image: haiodo/calendar:${HULY_VERSION}
-    ports:
-      - 8095:8095
-    environment:
-      - MONGO_URI=mongodb://mongodb:27017
-      - MONGO_DB=%calendar-service
-      - Credentials=<JSON_STRING_CREDENTIALS_FROM_GOOGLE_CONSOLE>
-      - WATCH_URL=https://${HOST_ADDRESS}/_calendar/push
-      - ACCOUNTS_URL=http://account:3000
-      - STATS_URL=http://stats:4900
-      - SECRET=${SECRET}
-      - KVS_URL=http://kvs:8094
-    restart: unless-stopped
-    networks:
-      - huly_net
+calendar:
+  image: haiodo/calendar:${HULY_VERSION}
+  ports:
+    - 8095:8095
+  environment:
+    - MONGO_URI=mongodb://mongodb:27017
+    - MONGO_DB=%calendar-service
+    - Credentials=<JSON_STRING_CREDENTIALS_FROM_GOOGLE_CONSOLE>
+    - WATCH_URL=https://${HOST_ADDRESS}/_calendar/push
+    - ACCOUNTS_URL=http://account:3000
+    - STATS_URL=http://stats:4900
+    - SECRET=${SECRET}
+    - KVS_URL=http://kvs:8094
+  restart: unless-stopped
+  networks:
+    - huly_net
 ```
 
 ## Configure OpenID Connect (OIDC)
@@ -504,10 +492,13 @@ Add `calendar` container to the docker-compose.yaml
 You can configure a Huly instance to authorize users (sign-in/sign-up) using an OpenID Connect identity provider (IdP).
 
 ### On the IdP side
+
 1. Create a new OpenID application.
-   * Use `{huly_account_svc}/auth/openid/callback` as the sign-in redirect URI. The `huly_account_svc` is the hostname for the account service of the deployment, which should be accessible externally from the client/browser side. In the provided example setup, the account service runs on port 3000.
+
+   - Use `{huly_account_svc}/auth/openid/callback` as the sign-in redirect URI. The `huly_account_svc` is the hostname for the account service of the deployment, which should be accessible externally from the client/browser side. In the provided example setup, the account service runs on port 3000.
 
    **URI Example:**
+
    - `http://huly.mydomain.com:3000/auth/openid/callback`
 
 2. Configure user access to the application as needed.
@@ -516,13 +507,13 @@ You can configure a Huly instance to authorize users (sign-in/sign-up) using an 
 
 For the account service, set the following environment variables as provided by the IdP:
 
-* OPENID_CLIENT_ID
-* OPENID_CLIENT_SECRET
-* OPENID_ISSUER
+- OPENID_CLIENT_ID
+- OPENID_CLIENT_SECRET
+- OPENID_ISSUER
 
 Ensure you have configured or add the following environment variable to the front service:
 
-* ACCOUNTS_URL (This should contain the URL of the account service, accessible from the client side.)
+- ACCOUNTS_URL (This should contain the URL of the account service, accessible from the client side.)
 
 You will need to expose your account service port (e.g. 3000) in your nginx.conf.
 
@@ -534,28 +525,30 @@ sign-in/sign-up pages.
 You can also configure a Huly instance to use GitHub OAuth for user authorization (sign-in/sign-up).
 
 ### On the GitHub side
-1. Create a new GitHub OAuth application.
-   * Use `{huly_account_svc}/_account/auth/github/callback` as the sign-in redirect URI. The `huly_account_svc` is the hostname for the account service of the deployment, which should be accessible externally from the client/browser side.
 
+1. Create a new GitHub OAuth application.
+
+   - Use `{huly_account_svc}/_account/auth/github/callback` as the sign-in redirect URI. The `huly_account_svc` is the hostname for the account service of the deployment, which should be accessible externally from the client/browser side.
 
    **URI Example:**
+
    - `http://huly.mydomain.com/_account/auth/github/callback`
 
 ### On the Huly side
 
 Specify the following environment variables for the account service:
 
-* `GITHUB_CLIENT_ID`
-* `GITHUB_CLIENT_SECRET`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
 
 Ensure you have configured or add the following environment variable to the front service:
 
-* `ACCOUNTS_URL` (The URL of the account service, accessible from the client side.)
+- `ACCOUNTS_URL` (The URL of the account service, accessible from the client side.)
 
 Notes:
 
-* The `ISSUER` environment variable is not required for GitHub OAuth.
-* Once all the required environment variables are configured, you will see an additional button on the sign-in/sign-up
+- The `ISSUER` environment variable is not required for GitHub OAuth.
+- Once all the required environment variables are configured, you will see an additional button on the sign-in/sign-up
   pages.
 
 ## Disable Sign-Up
@@ -566,16 +559,16 @@ link to a specific workspace.
 To implement this, set the following environment variable for both the front and account services:
 
 ```yaml
-  account:
-    # ...
-    environment:
-      - DISABLE_SIGNUP=true
-    # ...
-  front:
-    # ...
-    environment:
-      - DISABLE_SIGNUP=true
-    # ...
+account:
+  # ...
+  environment:
+    - DISABLE_SIGNUP=true
+  # ...
+front:
+  # ...
+  environment:
+    - DISABLE_SIGNUP=true
+  # ...
 ```
 
 _Note: When setting up a new deployment, either create the initial account before disabling sign-ups or use the

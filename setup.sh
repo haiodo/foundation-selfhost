@@ -43,6 +43,9 @@ fi
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
+PREV_LIVEKIT_TURN_DOMAIN="${LIVEKIT_TURN_DOMAIN}"
+
+RAW_HOST_INPUT=""
 
 while true; do
     if [[ -n "$HOST_ADDRESS" ]]; then
@@ -53,7 +56,8 @@ while true; do
         prompt_value="localhost"
     fi
     read -p "Enter the host address (domain name or IP) [${prompt_type}: ${prompt_value}]: " input
-    _HOST_ADDRESS="${input:-${HOST_ADDRESS:-localhost}}"
+    RAW_HOST_INPUT="${input:-${HOST_ADDRESS:-localhost}}"
+    _HOST_ADDRESS="$RAW_HOST_INPUT"
     break
 done
 
@@ -73,12 +77,12 @@ while true; do
         echo "Invalid port. Please enter a number between 1 and 65535."
     fi
 done
+HOST_ONLY="${_HOST_ADDRESS%%:*}"
 
-echo "$_HOST_ADDRESS $HOST_ADDRESS $_HTTP_PORT $HTTP_PORT"
-
-if [[ "$_HOST_ADDRESS" == "localhost" || "$_HOST_ADDRESS" == "127.0.0.1" || "$_HOST_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:?$ ]]; then
-    _HOST_ADDRESS="${_HOST_ADDRESS%:}:${_HTTP_PORT}"
+if [[ "$HOST_ONLY" == "localhost" || "$HOST_ONLY" == "127.0.0.1" || "$HOST_ONLY" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    _HOST_ADDRESS="${HOST_ONLY}:${_HTTP_PORT}"
     SECURE=""
+    _SECURE=""
 else
     while true; do
         if [[ -n "$SECURE" ]]; then
@@ -100,6 +104,103 @@ else
                 echo "Invalid input. Please enter Y or N.";;
         esac
     done
+fi
+
+HOST_FOR_TURN="$HOST_ONLY"
+HOST_FOR_TURN="${HOST_FOR_TURN:-$RAW_HOST_INPUT}"
+
+HOST_PORT_VALUE=""
+if [[ "$_HOST_ADDRESS" == *:* && "$_HOST_ADDRESS" != "$HOST_ONLY" ]]; then
+    HOST_PORT_VALUE="${_HOST_ADDRESS##*:}"
+fi
+
+if [[ -n "$HOST_PORT_VALUE" ]]; then
+    LIVEKIT_EXTERNAL_PORT="$HOST_PORT_VALUE"
+elif [[ -n "$_SECURE" ]]; then
+    LIVEKIT_EXTERNAL_PORT="443"
+else
+    LIVEKIT_EXTERNAL_PORT="$_HTTP_PORT"
+fi
+
+LIVEKIT_DEFAULT_CHOICE="n"
+if [[ -n "$LIVEKIT_API_KEY" && -n "$LIVEKIT_API_SECRET" ]]; then
+    LIVEKIT_DEFAULT_CHOICE="Y"
+fi
+
+_LIVEKIT_ENABLED=false
+_LIVEKIT_API_KEY="$LIVEKIT_API_KEY"
+_LIVEKIT_API_SECRET="$LIVEKIT_API_SECRET"
+
+read -p "Enable LiveKit (audio & video calls)? (y/N) [default: ${LIVEKIT_DEFAULT_CHOICE}]: " input
+case "$input" in
+    [Yy]*)
+        _LIVEKIT_ENABLED=true
+        ;;
+    "")
+        if [[ "$LIVEKIT_DEFAULT_CHOICE" == "Y" ]]; then
+            _LIVEKIT_ENABLED=true
+        fi
+        ;;
+    *)
+        _LIVEKIT_ENABLED=false
+        ;;
+esac
+
+if [[ "$_LIVEKIT_ENABLED" == true ]]; then
+    REUSE_PROMPT=1
+    if [[ -z "$_LIVEKIT_API_KEY" || -z "$_LIVEKIT_API_SECRET" ]]; then
+        REUSE_PROMPT=0
+    fi
+
+    REGENERATE_LIVEKIT=false
+    if (( REUSE_PROMPT )); then
+        read -p "Reuse existing LiveKit credentials? (Y/n): " reuse_answer
+        case "$reuse_answer" in
+            [Nn]*)
+                REGENERATE_LIVEKIT=true
+                ;;
+            *)
+                REGENERATE_LIVEKIT=false
+                ;;
+        esac
+    else
+        REGENERATE_LIVEKIT=true
+    fi
+
+    if [[ "$REGENERATE_LIVEKIT" == true ]]; then
+        if ! command -v docker >/dev/null 2>&1; then
+            echo "Docker is required to generate LiveKit credentials automatically."
+        else
+            echo "Generating LiveKit credentials via livekit/generate..."
+            if ! docker run --rm -it -v "$PWD":/output livekit/generate --local; then
+                echo "LiveKit credential generation failed."
+            fi
+        fi
+    fi
+
+    if [[ -f livekit.yaml ]]; then
+        LIVEKIT_KEYS_LINE=$(awk '/^keys:/ {getline; gsub(/^[[:space:]]+/, "", $0); print $0; exit}' livekit.yaml)
+        if [[ -n "$LIVEKIT_KEYS_LINE" ]]; then
+            _LIVEKIT_API_KEY=$(printf '%s' "$LIVEKIT_KEYS_LINE" | cut -d':' -f1 | tr -d '[:space:]')
+            _LIVEKIT_API_SECRET=$(printf '%s' "$LIVEKIT_KEYS_LINE" | cut -d':' -f2- | sed 's/^[[:space:]]*//')
+        fi
+    fi
+
+    while [[ -z "$_LIVEKIT_API_KEY" ]]; do
+        read -p "Enter LiveKit API Key: " _LIVEKIT_API_KEY
+    done
+
+    while [[ -z "$_LIVEKIT_API_SECRET" ]]; do
+        read -s -p "Enter LiveKit API Secret: " secret_input
+        echo
+        if [[ -n "$secret_input" ]]; then
+            _LIVEKIT_API_SECRET="$secret_input"
+        fi
+    done
+    unset secret_input
+else
+    _LIVEKIT_API_KEY=""
+    _LIVEKIT_API_SECRET=""
 fi
 
 # Volume path configuration
@@ -178,6 +279,70 @@ if [ ! -f .rp.secret ]; then
   echo "Secret generated and stored in .rp.secret"
 fi
 
+LIVEKIT_TURN_DOMAIN=""
+_LIVEKIT_HOST=""
+if [[ "$_LIVEKIT_ENABLED" == true ]]; then
+    if [[ "$HOST_FOR_TURN" == "localhost" || "$HOST_FOR_TURN" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        DEFAULT_TURN_DOMAIN="$HOST_FOR_TURN"
+    else
+        DEFAULT_TURN_DOMAIN="turn.${HOST_FOR_TURN}"
+    fi
+    CURRENT_TURN_DOMAIN="${PREV_LIVEKIT_TURN_DOMAIN:-$DEFAULT_TURN_DOMAIN}"
+    read -p "Enter TURN domain (DNS record pointing to this server) [${CURRENT_TURN_DOMAIN}]: " turn_input
+    LIVEKIT_TURN_DOMAIN="${turn_input:-$CURRENT_TURN_DOMAIN}"
+    unset turn_input
+
+    LIVEKIT_BASE_HOST="$HOST_ONLY"
+    if [[ -n "$_SECURE" ]]; then
+        if [[ "$LIVEKIT_EXTERNAL_PORT" != "443" ]]; then
+            LIVEKIT_BASE_HOST="${LIVEKIT_BASE_HOST}:${LIVEKIT_EXTERNAL_PORT}"
+        fi
+    else
+        if [[ "$LIVEKIT_EXTERNAL_PORT" != "80" ]]; then
+            LIVEKIT_BASE_HOST="${LIVEKIT_BASE_HOST}:${LIVEKIT_EXTERNAL_PORT}"
+        fi
+    fi
+
+    if [[ -n "$_SECURE" ]]; then
+        LIVEKIT_SCHEME="wss"
+    else
+        LIVEKIT_SCHEME="ws"
+    fi
+
+    _LIVEKIT_HOST="${LIVEKIT_SCHEME}://${LIVEKIT_BASE_HOST}/livekit"
+
+    if [[ -f .template.livekit.yaml ]]; then
+        LIVEKIT_API_KEY_VALUE="$_LIVEKIT_API_KEY" \
+        LIVEKIT_API_SECRET_VALUE="$_LIVEKIT_API_SECRET" \
+        LIVEKIT_TURN_DOMAIN_VALUE="$LIVEKIT_TURN_DOMAIN" \
+        python3 - <<'PY'
+import os
+from pathlib import Path
+
+template_path = Path('.template.livekit.yaml')
+output_path = Path('livekit.yaml')
+
+key = os.environ.get('LIVEKIT_API_KEY_VALUE', '').strip()
+secret = os.environ.get('LIVEKIT_API_SECRET_VALUE', '').strip()
+turn_domain = os.environ.get('LIVEKIT_TURN_DOMAIN_VALUE', '').strip()
+
+content = template_path.read_text()
+content = content.replace('server_key', key)
+content = content.replace('server_secret', secret)
+content = content.replace('turn_server_name', turn_domain)
+if not content.endswith('\n'):
+    content += '\n'
+output_path.write_text(content)
+print('LiveKit configuration updated at livekit.yaml')
+PY
+    else
+        echo "LiveKit template (.template.livekit.yaml) not found; skipping livekit.yaml generation."
+    fi
+else
+    _LIVEKIT_API_KEY=""
+    _LIVEKIT_API_SECRET=""
+fi
+
 export HOST_ADDRESS=$_HOST_ADDRESS
 export SECURE=$_SECURE
 export HTTP_PORT=$_HTTP_PORT
@@ -195,9 +360,11 @@ export VOLUME_REDPANDA_PATH=$_VOLUME_REDPANDA_PATH
 export HULY_SECRET=$(cat .huly.secret)
 export POSTGRES_SECRET=$(cat .postgres.secret)
 export REDPANDA_SECRET=$(cat .rp.secret)
-export LIVEKIT_HOST=${LIVEKIT_HOST}
-export LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-export LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+export LIVEKIT_HOST=${_LIVEKIT_HOST}
+export LIVEKIT_API_KEY=${_LIVEKIT_API_KEY}
+export LIVEKIT_API_SECRET=${_LIVEKIT_API_SECRET}
+export LIVEKIT_TURN_DOMAIN=${LIVEKIT_TURN_DOMAIN}
+export LIVEKIT_ENABLED=${_LIVEKIT_ENABLED}
 
 envsubst < .template.huly.conf > $CONFIG_FILE
 
@@ -216,6 +383,11 @@ echo -e "Elasticsearch Volume: \033[1;32m${_VOLUME_ELASTIC_PATH:-Docker named vo
 echo -e "Files Volume: \033[1;32m${_VOLUME_FILES_PATH:-Docker named volume}\033[0m"
 echo -e "PostgreSQL Volume: \033[1;32m${_VOLUME_POSTGRES_DATA_PATH:-Docker named volume}\033[0m"
 echo -e "Redpanda Volume: \033[1;32m${_VOLUME_REDPANDA_PATH:-Docker named volume}\033[0m"
+if [[ "$_LIVEKIT_ENABLED" == true ]]; then
+    echo -e "LiveKit: \033[1;32mEnabled\033[0m (Endpoint: $_LIVEKIT_HOST, TURN host: ${LIVEKIT_TURN_DOMAIN})"
+else
+    echo -e "LiveKit: \033[1;31mDisabled\033[0m"
+fi
 
 read -p "Do you want to run 'docker compose up -d' now to start Huly? (Y/n): " RUN_DOCKER
 case "${RUN_DOCKER:-Y}" in

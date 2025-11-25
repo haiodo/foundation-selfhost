@@ -25,10 +25,8 @@ turn:
   tls_port: 5349
   udp_port: 3478
   external_tls: true
-  tls_cert: /etc/livekit/certs/fullchain.pem
-  tls_key: /etc/livekit/certs/privkey.pem
-  secret: ''
-  user_lifetime: 24h
+  cert_file: /etc/livekit/certs/fullchain.pem
+  key_file: /etc/livekit/certs/privkey.pem
 keys:
   server_key: server_secret
 logging:

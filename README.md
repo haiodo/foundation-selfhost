@@ -342,27 +342,30 @@ Huly audio and video calls are created on top of a LiveKit media server. The rep
 `love`, `front`, and `livekit` services; you only need to provide credentials and networking.
 
 1. Run `./setup.sh` and answer **Yes** when prompted about LiveKit. The helper can reuse an existing
-   configuration or execute `docker run --rm -it -v "$PWD":/output livekit/generate --local` to mint a new
-   API key and secret, update `livekit.yaml`, and inject the resulting values into `huly_v7.conf`.
+  configuration or execute `docker run --rm -it -v "$PWD":/output livekit/generate --local` to mint a new
+  API key and secret, update `livekit.yaml`, and inject the resulting values into `huly_v7.conf`.
 2. When asked for the TURN domain, supply a DNS hostname that resolves to the same IP as your primary Huly domain.
-   The script suggests `turn.<your-domain>` automatically, but you can override it if you prefer a different
-   subdomain. Make sure you create DNS records for both the primary hostname and the TURN hostname, and open these
-   ports on your firewall/router:
-   - `7880/tcp` – LiveKit HTTP/WebSocket API
-   - `7881/tcp` – TCP relay
-   - `5349/tcp` – TURN over TLS
-   - `5349/udp` – TURN over TLS (DTLS/UDP fallback)
-   - `3478/tcp` and `3478/udp` – TURN
-   - `50000-60000/udp` – media relay range
+  The script suggests `turn.<your-domain>` automatically, but you can override it if you prefer a different
+  subdomain. Make sure you create DNS records for both the primary hostname and the TURN hostname, and open these
+  ports on your firewall/router:
 
-To present your own certificate on port `5349`, drop the PEM-encoded full-chain certificate and private key
-into `./certs/fullchain.pem` and `./certs/privkey.pem` respectively before starting Docker. Both the `nginx`
-and `livekit` services mount that directory (read-only), and the generated `livekit.yaml` already points the
-TURN settings at `/etc/livekit/certs/fullchain.pem` and `/etc/livekit/certs/privkey.pem`.
-LiveKit must stay on the `huly_net` Docker network so it can talk to `redis`, so do **not** switch it to host
-networking—publishing the ports above is sufficient. 3. Start `docker compose up -d`. The compose file already propagates the `LIVEKIT_*` variables to both the
-`love` backend and the `front` web application, while the nginx templates expose `/livekit/` so clients can
-reach the server via `ws(s)://<your-domain>/livekit`.
+- `7880/tcp` – LiveKit HTTP/WebSocket API
+- `7881/tcp` – TCP relay
+- `5349/tcp` – TURN over TLS
+- `5349/udp` – TURN over TLS (DTLS/UDP fallback)
+- `3478/tcp` and `3478/udp` – TURN
+- `50000-60000/udp` – media relay range
+
+3. To present your own certificate on port `5349`, drop the PEM-encoded full-chain certificate and private key
+  into `./certs/fullchain.pem` and `./certs/privkey.pem` respectively before starting Docker. Both the `nginx`
+  and `livekit` services mount that directory (read-only), and the generated `livekit.yaml` already points the
+  TURN settings at `/etc/livekit/certs/fullchain.pem` and `/etc/livekit/certs/privkey.pem`.
+4. The `livekit` service now runs with `network_mode: host`. Ensure those ports are free on the host, lock down
+  firewall rules so only trusted networks can reach them, and note that Redis is published on `6379` so LiveKit
+  can talk to it via `127.0.0.1:6379`.
+5. Start `docker compose up -d`. The compose file already propagates the `LIVEKIT_*` variables to both the
+  `love` backend and the `front` web application, while the nginx templates expose `/livekit/` so clients can
+  reach the server via `ws(s)://<your-domain>/livekit`.
 
 ## Print Service
 

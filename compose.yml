@@ -295,6 +295,8 @@ services:
       - huly_net
   redis:
     image: redis:8.0.2-alpine3.21
+    ports:
+      - 6379:6379
     restart: unless-stopped
     networks:
       - huly_net
@@ -435,19 +437,18 @@ services:
       redis:
         condition: service_started
     restart: unless-stopped
-    ports:
-      - 7880:7880/tcp
-      - 7881:7881/tcp
-      - 5349:5349/tcp
-      - 5349:5349/udp
-      - 3478:3478/tcp
-      - 3478:3478/udp
-      - '50000-60000:50000-60000/udp'
+    # ports:
+    #   - 7880:7880/tcp
+    #   - 7881:7881/tcp
+    #   - 5349:5349/tcp
+    #   - 5349:5349/udp
+    #   - 3478:3478/tcp
+    #   - 3478:3478/udp
+    # - '50000-60000:50000-60000/udp'
+    network_mode: 'host'
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
       - ./certs:/etc/livekit/certs:ro
-    networks:
-      - huly_net
 
 volumes:
   # These named volumes are used when custom volume paths are not specified

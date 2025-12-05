@@ -221,7 +221,7 @@ services:
   datalake:
     image: haiodo/datalake:${HULY_VERSION}
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     depends_on:
       minio:
         condition: service_healthy
@@ -273,7 +273,7 @@ services:
   rating:
     image: haiodo/rating:${HULY_VERSION}
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     links:
       - postgres
       - minio
@@ -320,7 +320,7 @@ services:
   process-service:
     image: haiodo/process:${HULY_VERSION}
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     depends_on:
       redpanda:
         condition: service_started
@@ -337,7 +337,7 @@ services:
   stream:
     image: 'haiodo/stream:${HULY_VERSION}'
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     environment:
       #      - STREAM_ENDPOINT_URL=s3://minio
       - STREAM_ENDPOINT_URL=datalake://datalake:4031
@@ -358,7 +358,7 @@ services:
   media:
     image: 'haiodo/media:${HULY_VERSION}'
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     environment:
       - ACCOUNTS_URL=http://account:3000
       - SECRET=${SECRET}
@@ -369,7 +369,7 @@ services:
   preview:
     image: 'haiodo/preview:${HULY_VERSION}'
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     environment:
       - SECRET=${SECRET}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
@@ -384,7 +384,7 @@ services:
   love:
     image: haiodo/love:${HULY_VERSION}
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     environment:
       - PORT=8097
       - SECRET=${SECRET}
@@ -392,7 +392,7 @@ services:
       - DB_URL=${CR_DB_URL}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - STORAGE_PROVIDER_NAME=minio
-      - LIVEKIT_HOST=${LIVEKIT_HOST}
+      - LIVEKIT_HOST=ws://host.docker.internal:7880
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - BILLING_URL=http://billing:4042
@@ -407,7 +407,7 @@ services:
     ports:
       - 4011:4011
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     restart: unless-stopped
     links:
       - account
@@ -458,7 +458,7 @@ services:
   billing:
     image: haiodo/billing:${HULY_VERSION}
     extra_hosts:
-      - 'huly.local:host-gateway'
+      - 'host.docker.internal:host-gateway'
     depends_on:
       postgres:
         condition: service_healthy

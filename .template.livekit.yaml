@@ -21,14 +21,14 @@ redis:
   max_redirects: null
 turn:
   enabled: true
-  domain: turn_server_name
+  domain: ${LIVEKIT_TURN_DOMAIN}
   tls_port: 5349
   udp_port: 3478
   external_tls: true
   cert_file: /etc/livekit/certs/fullchain.pem
   key_file: /etc/livekit/certs/privkey.pem
 keys:
-  server_key: server_secret
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
 logging:
   json: false
   level: info

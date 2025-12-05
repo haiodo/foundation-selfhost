@@ -312,29 +312,11 @@ if [[ "$_LIVEKIT_ENABLED" == true ]]; then
     _LIVEKIT_HOST="${LIVEKIT_SCHEME}://${LIVEKIT_BASE_HOST}/livekit"
 
     if [[ -f .template.livekit.yaml ]]; then
-        LIVEKIT_API_KEY_VALUE="$_LIVEKIT_API_KEY" \
-        LIVEKIT_API_SECRET_VALUE="$_LIVEKIT_API_SECRET" \
-        LIVEKIT_TURN_DOMAIN_VALUE="$LIVEKIT_TURN_DOMAIN" \
-        python3 - <<'PY'
-import os
-from pathlib import Path
-
-template_path = Path('.template.livekit.yaml')
-output_path = Path('livekit.yaml')
-
-key = os.environ.get('LIVEKIT_API_KEY_VALUE', '').strip()
-secret = os.environ.get('LIVEKIT_API_SECRET_VALUE', '').strip()
-turn_domain = os.environ.get('LIVEKIT_TURN_DOMAIN_VALUE', '').strip()
-
-content = template_path.read_text()
-content = content.replace('server_key', key)
-content = content.replace('server_secret', secret)
-content = content.replace('turn_server_name', turn_domain)
-if not content.endswith('\n'):
-    content += '\n'
-output_path.write_text(content)
-print('LiveKit configuration updated at livekit.yaml')
-PY
+        export LIVEKIT_API_KEY="$_LIVEKIT_API_KEY"
+        export LIVEKIT_API_SECRET="$_LIVEKIT_API_SECRET"
+        export LIVEKIT_TURN_DOMAIN="$LIVEKIT_TURN_DOMAIN"
+        envsubst < .template.livekit.yaml > livekit.yaml
+        echo "LiveKit configuration updated at livekit.yaml"
     else
         echo "LiveKit template (.template.livekit.yaml) not found; skipping livekit.yaml generation."
     fi

@@ -369,6 +369,10 @@ export STT_PROVIDER=${STT_PROVIDER:-openai}
 export STT_URL=${STT_URL}
 export STT_API_KEY=${STT_API_KEY}
 export STT_MODEL=${STT_MODEL}
+export OPENAI_API_KEY=${OPENAI_API_KEY:-token}
+export OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://localhost:1234/v1/}
+export OPENAI_SUMMARY_MODEL=${OPENAI_SUMMARY_MODEL:-openai/gpt-oss-20b}
+export OPENAI_TRANSLATE_MODEL=${OPENAI_TRANSLATE_MODEL:-openai/gpt-oss-20b}
 
 envsubst < .template.huly.conf > $CONFIG_FILE
 
